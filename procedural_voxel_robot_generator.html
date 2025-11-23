@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procedural Voxel Robot Generator</title>
+    <style>
+        :root {
+            --bg-color: #050510;
+            --ui-bg: rgba(10, 15, 25, 0.85);
+            --text-color: #a0a0ff;
+            --accent: #00f3ff;
+            --warn: #ff3366;
+            --font-main: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-main);
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
+        }
+
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 280px;
+            padding: 20px;
+            background: var(--ui-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+            z-index: 10;
+            box-sizing: border-box; 
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 600px) {
+            #ui-panel {
+                top: auto;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                max-height: 50vh;
+                border-radius: 20px 20px 0 0;
+                border-bottom: none;
+                border-left: none;
+                border-right: none;
+                box-shadow: 0 -5px 20px rgba(0, 243, 255, 0.2);
+            }
+
+            h1 { font-size: 1rem; margin-bottom: 10px; }
+            .control-group { margin-bottom: 10px; }
+            input[type="range"] { padding: 5px 0; }
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            margin: 0 0 15px 0;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .control-group { margin-bottom: 15px; }
+
+        label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+            color: #88aaff;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+
+        input[type="text"] {
+            width: 60%;
+            padding: 5px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #334466;
+            color: var(--accent);
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        button {
+            background: transparent;
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            background: var(--accent);
+            color: #000;
+            box-shadow: 0 0 15px var(--accent);
+        }
+
+        #morphBtn {
+            border-color: var(--warn);
+            color: var(--warn);
+        }
+
+        #morphBtn:hover {
+            background: var(--warn);
+            color: white;
+            box-shadow: 0 0 15px var(--warn);
+        }
+
+        /* Music Toggle Style */
+        #musicBtn {
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border: 1px solid #a0a0ff;
+            color: #a0a0ff;
+            margin-left: 10px;
+        }
+        #musicBtn.active {
+            background: #a0a0ff;
+            color: #000;
+            box-shadow: 0 0 10px #a0a0ff;
+        }
+
+        .row { display: flex; gap: 5px; margin-bottom: 10px; }
+        .btn-secondary { border-color: #666; color: #aaa; }
+        .btn-full { width: 100%; margin-top: 10px; }
+
+        select {
+            width: 100%;
+            padding: 5px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #334466;
+            color: white;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334466; border-radius: 3px; }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            color: var(--accent);
+            pointer-events: none;
+            transition: opacity 0.5s;
+            text-shadow: 0 0 20px var(--accent);
+            font-family: monospace;
+        }
+    </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    <div id="loading">INITIALIZING SYSTEMS...</div>
+
+    <div id="ui-panel">
+        <h1>
+            VOXEL CORE 
+            <button id="musicBtn">♫ OFF</button>
+        </h1>
+        
+        <div class="control-group">
+            <div class="row">
+                <input type="text" id="seedInput" placeholder="Alpha-001">
+                <button id="randomSeedBtn">🎲</button>
+            </div>
+            <button id="generateBtn" class="btn-full">GENERATE CHASSIS</button>
+        </div>
+        
+        <button id="morphBtn" class="btn-full">💥 DECONSTRUCT & MORPH</button>
+
+        <div class="control-group" style="margin-top: 15px;">
+            <label>Material Config</label>
+            <select id="paletteSelect">
+                <option value="industrial">Heavy Industry</option>
+                <option value="neon">Cyber Neon</option>
+                <option value="military">Tactical Ops</option>
+                <option value="chrome">Pure Chrome</option>
+                <option value="titanium">Refined Titanium</option>
+                <option value="modern_bw">Modern B&W</option>
+                <option value="true_black">True Black (Stealth)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Height Scale <span></span></label>
+            <input type="range" id="heightRange" min="0.5" max="1.5" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label>Torso Width <span></span></label>
+            <input type="range" id="widthRange" min="0.5" max="1.5" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label>Limb Thickness <span></span></label>
+            <input type="range" id="thicknessRange" min="0" max="2" step="1" value="1">
+        </div>
+
+        <div class="control-group">
+            <label>Head Size <span></span></label>
+            <input type="range" id="headRange" min="0.5" max="1.5" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label>Detail Density <span></span></label>
+            <input type="range" id="detailRange" min="0.1" max="1.0" step="0.1" value="0.5">
+        </div>
+
+        <button id="downloadBtn" class="btn-full btn-secondary">💾 EXPORT BLUEPRINT</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+        // --- 1. SOUND & MUSIC ENGINE (DEEP DUB) ---
+        class SoundFX {
+            constructor() {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.masterGain = this.ctx.createGain();
+                this.masterGain.gain.value = 0.2;
+                this.masterGain.connect(this.ctx.destination);
+                this.enabled = false;
+                
+                // Music State
+                this.musicPlaying = false;
+                this.nextNoteTime = 0;
+                this.tempo = 102; // Slow Hypnotic
+                this.beatCount = 0;
+                this.totalBeats = 0;
+                this.timerID = null;
+                this.lookahead = 25.0; 
+                this.scheduleAheadTime = 0.1;
+                this.noiseBuffer = null;
+                
+                // Notes for Subtle Synth (Dropped Octave for Deep Tone)
+                // D3 Minor Pentatonic range (~146Hz)
+                this.synthNotes = [146.83, 174.61, 196.00, 220.00, 261.63];
+            }
+
+            enable() {
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+                this.enabled = true;
+                if (!this.noiseBuffer) {
+                    const bufferSize = this.ctx.sampleRate * 2;
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                    this.noiseBuffer = buffer;
+                }
+            }
+
+            toggleMusic() {
+                this.enable();
+                this.musicPlaying = !this.musicPlaying;
+                if (this.musicPlaying) {
+                    this.nextNoteTime = this.ctx.currentTime;
+                    this.beatCount = 0;
+                    this.totalBeats = 0;
+                    this.scheduler();
+                    return true;
+                } else {
+                    window.clearTimeout(this.timerID);
+                    return false;
+                }
+            }
+
+            scheduler() {
+                while (this.nextNoteTime < this.ctx.currentTime + this.scheduleAheadTime) {
+                    this.scheduleNote(this.beatCount, this.nextNoteTime);
+                    this.nextNote();
+                }
+                if (this.musicPlaying) {
+                    this.timerID = window.setTimeout(() => this.scheduler(), this.lookahead);
+                }
+            }
+
+            nextNote() {
+                const secondsPerBeat = 60.0 / this.tempo;
+                this.nextNoteTime += 0.25 * secondsPerBeat; // 16th notes
+                this.beatCount++;
+                this.totalBeats++;
+                if (this.beatCount === 16) this.beatCount = 0;
+            }
+
+            scheduleNote(beatNumber, time) {
+                // GENERATIVE MACRO CONTROLS
+                const density = (Math.sin(this.totalBeats * 0.05) + 1) / 2; 
+
+                // Kick: Beats 0, 4, 8, 12
+                const isBreakdown = (this.totalBeats % 128 > 112); 
+                if (beatNumber % 4 === 0 && !isBreakdown) {
+                    this.playKick(time);
+                }
+
+                // Hats: Steady offbeat
+                if (beatNumber % 4 === 2) {
+                     this.playHat(time, 0.03); 
+                }
+                // Occasional extra 16th hat
+                if (Math.random() < (0.1 * density)) {
+                    this.playHat(time, 0.01);
+                }
+
+                // Claps: Backbeat (4, 12)
+                if (beatNumber === 4 || beatNumber === 12) {
+                    if (Math.random() > 0.2) {
+                        this.playClap(time);
+                    }
+                }
+
+                // Subtle Synth (Deep Tone Generative)
+                if (Math.random() < 0.15) {
+                    this.playSubtleSynth(time);
+                }
+
+                // Deep Dub Texture
+                if ((beatNumber === 0 || beatNumber === 10) && Math.random() < (0.3 + (density * 0.4))) {
+                     this.playDubChord(time);
+                }
+
+                // Rolling Sub Bass
+                if (beatNumber % 4 !== 0 && !isBreakdown) {
+                    this.playBass(time);
+                }
+            }
+
+            playKick(time) {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.frequency.setValueAtTime(80, time); // Lower start
+                osc.frequency.exponentialRampToValueAtTime(20, time + 0.3); // Deep drop
+                
+                gain.gain.setValueAtTime(0.8, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.6); 
+                
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(time);
+                osc.stop(time + 0.6);
+            }
+
+            playClap(time, vol = 0.15) {
+                const src = this.ctx.createBufferSource();
+                src.buffer = this.noiseBuffer;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 800 + Math.random() * 400; // Lower tone
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(vol, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08); 
+                
+                src.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.masterGain);
+                src.start(time);
+                src.stop(time + 0.1);
+            }
+
+            playHat(time, vol) {
+                const src = this.ctx.createBufferSource();
+                src.buffer = this.noiseBuffer;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 6000; // Darker hats
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(vol, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+                src.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.masterGain);
+                src.start(time);
+                src.stop(time + 0.04);
+            }
+
+            playBass(time) {
+                const osc = this.ctx.createOscillator();
+                osc.type = 'triangle'; 
+                osc.frequency.setValueAtTime(35, time); // Deep Sub
+                
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 120; 
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.25, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.2); 
+                
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(time);
+                osc.stop(time + 0.2);
+            }
+
+            playDubChord(time) {
+                // Lowered by Octave (D2 Range)
+                const freqs = [73.42, 87.31, 110.00]; 
+                
+                freqs.forEach((f, i) => {
+                    const osc = this.ctx.createOscillator();
+                    osc.type = 'sawtooth';
+                    osc.frequency.value = f;
+                    
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(100, time); // Darker start
+                    filter.frequency.exponentialRampToValueAtTime(300, time + 0.1); 
+                    filter.frequency.exponentialRampToValueAtTime(80, time + 1.5); 
+
+                    const gain = this.ctx.createGain();
+                    gain.gain.setValueAtTime(0.03, time);
+                    gain.gain.exponentialRampToValueAtTime(0.001, time + 1.5); 
+                    
+                    osc.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.masterGain);
+                    osc.start(time);
+                    osc.stop(time + 1.5);
+                });
+            }
+
+            playSubtleSynth(time) {
+                // Deep Sine Blip (Octave Lower)
+                const osc = this.ctx.createOscillator();
+                osc.type = 'sine';
+                // Pick random note from lower range
+                const freq = this.synthNotes[Math.floor(Math.random() * this.synthNotes.length)];
+                osc.frequency.value = freq;
+
+                // Darker Filter
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 400; // Much lower filter
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0, time);
+                gain.gain.linearRampToValueAtTime(0.05, time + 0.05); // Slow attack
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.5); // Longer decay
+
+                const panner = this.ctx.createStereoPanner();
+                panner.pan.value = (Math.random() * 1.5) - 0.75;
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(panner);
+                panner.connect(this.masterGain);
+
+                osc.start(time);
+                osc.stop(time + 0.5);
+            }
+
+            // --- SFX ---
+            playBuild() {
+                if (!this.enabled) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200, t);
+                osc.frequency.exponentialRampToValueAtTime(600, t + 0.5);
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.1, t + 0.1);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(t);
+                osc.stop(t + 0.5);
+            }
+
+            playDeconstruct() {
+                if (!this.enabled) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(60, t);
+                osc.frequency.exponentialRampToValueAtTime(20, t + 1.5);
+                gain.gain.setValueAtTime(0.2, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(t);
+                osc.stop(t + 1.5);
+            }
+
+            playClick() {
+                if (!this.enabled) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, t);
+                gain.gain.setValueAtTime(0.05, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(t);
+                osc.stop(t+0.05);
+            }
+        }
+
+        // --- 2. UTILITIES & NAME GENERATOR ---
+        const GREEK_ALPHABET = [
+            'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 
+            'Iota', 'Kappa', 'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 
+            'Rho', 'Sigma', 'Tau', 'Upsilon', 'Phi', 'Chi', 'Psi', 'Omega'
+        ];
+
+        function generateGreekName() {
+            const prefix = GREEK_ALPHABET[Math.floor(Math.random() * GREEK_ALPHABET.length)];
+            const suffix = Math.floor(Math.random() * 999).toString().padStart(3, '0');
+            return `${prefix}-${suffix}`;
+        }
+
+        function mulberry32(a) {
+            return function() {
+                var t = a += 0x6D2B79F5;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            }
+        }
+
+        function cyrb128(str) {
+            let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
+            for (let i = 0, k; i < str.length; i++) {
+                k = str.charCodeAt(i);
+                h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+                h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+                h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+                h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+            }
+            h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+            h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+            h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+            h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+            return (h1^h2^h3^h4) >>> 0;
+        }
+
+        const TYPES = { CORE: 0, ARMOR: 1, JOINT: 2, SENSOR: 3, ENERGY: 4, DETAIL: 5 };
+
+        // --- 3. GENERATION LOGIC ---
+        class VoxelGenerator {
+            constructor(seed) {
+                this.seed = seed;
+                const seedNum = cyrb128(seed.toString());
+                this.rng = mulberry32(seedNum);
+                this.voxels = new Map();
+                this.minY = Infinity;
+            }
+            rand() { return this.rng(); }
+            randRange(min, max) { return min + (max - min) * this.rand(); }
+            set(x, y, z, type) {
+                const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+                this.voxels.set(key, type);
+                if (y < this.minY) this.minY = y;
+            }
+            setSym(x, y, z, type) {
+                this.set(x, y, z, type);
+                if (x !== 0) this.set(-x, y, z, type);
+            }
+            fillBox(x1, y1, z1, x2, y2, z2, type, symmetry = true) {
+                for(let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+                    for(let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+                        for(let z = Math.min(z1, z2); z <= Math.max(z1, z2); z++) {
+                            if (symmetry) this.setSym(x, y, z, type);
+                            else this.set(x, y, z, type);
+                        }
+                    }
+                }
+            }
+            getVoxelData() {
+                const arr = [];
+                this.voxels.forEach((type, key) => {
+                    const [x,y,z] = key.split(',').map(Number);
+                    arr.push({x, y, z, type});
+                });
+                return arr;
+            }
+        }
+
+        class RobotGen extends VoxelGenerator {
+            generate(params) {
+                this.voxels.clear();
+                const torsoW = Math.floor(3 * params.width * this.randRange(0.8, 1.2));
+                const torsoH = Math.floor(5 * params.height * this.randRange(0.8, 1.2));
+                const torsoD = Math.floor(2 * this.randRange(1, 1.5));
+                const torsoY = Math.floor(6 * params.height);
+
+                this.fillBox(0, torsoY, 0, torsoW, torsoY + torsoH, torsoD, TYPES.CORE);
+                this.fillBox(1, torsoY + 1, -torsoD-1, torsoW+1, torsoY + torsoH - 1, torsoD+1, TYPES.ARMOR);
+
+                const headSize = Math.floor(2 * params.head);
+                const headY = torsoY + torsoH + 1;
+                this.fillBox(0, torsoY + torsoH, 0, 0, headY, 0, TYPES.JOINT);
+                this.fillBox(0, headY, -1, headSize, headY + headSize, 1, TYPES.ARMOR);
+                this.setSym(1, headY + Math.floor(headSize/2), 2, TYPES.SENSOR);
+
+                const hipW = torsoW;
+                const hipY = torsoY - 1;
+                this.fillBox(0, hipY, 0, hipW, hipY, 1, TYPES.JOINT);
+
+                const legLen = Math.floor(6 * params.height);
+                const legThick = 1 + params.thickness;
+                const legX = hipW;
+                
+                this.fillBox(legX, hipY, 0, legX + legThick -1, hipY - Math.floor(legLen/2), 0, TYPES.ARMOR);
+                const kneeY = hipY - Math.floor(legLen/2) - 1;
+                this.fillBox(legX, kneeY, 0, legX, kneeY, 1, TYPES.JOINT);
+                this.fillBox(legX, kneeY - 1, 0, legX + legThick, kneeY - Math.floor(legLen/2), 1, TYPES.ARMOR);
+                const footY = kneeY - Math.floor(legLen/2) - 1;
+                this.fillBox(legX, footY, -1, legX + legThick, footY, 2, TYPES.CORE);
+
+                const armLen = Math.floor(5 * params.height);
+                const shoulderY = torsoY + torsoH - 1;
+                const shoulderX = torsoW + 1;
+                
+                this.fillBox(shoulderX, shoulderY, 0, shoulderX + 1 + params.thickness, shoulderY + 2, 1, TYPES.ARMOR);
+                const armThick = params.thickness;
+                this.fillBox(shoulderX + 1, shoulderY - 1, 0, shoulderX + 1 + armThick, shoulderY - Math.floor(armLen/2), 0, TYPES.CORE);
+                const elbowY = shoulderY - Math.floor(armLen/2) - 1;
+                this.fillBox(shoulderX + 1, elbowY, 0, shoulderX + 1, elbowY, 0, TYPES.JOINT);
+
+                if (this.rand() > 0.5) {
+                    this.fillBox(shoulderX + 1, elbowY - 1, -1, shoulderX + 2 + armThick, elbowY - Math.floor(armLen/2), 1, TYPES.ARMOR);
+                    this.fillBox(shoulderX + 1, elbowY - Math.floor(armLen/2) - 1, 0, shoulderX + 1, elbowY - Math.floor(armLen/2) - 3, 0, TYPES.ENERGY);
+                } else {
+                    this.fillBox(shoulderX + 1, elbowY - 1, 0, shoulderX + 1 + armThick, elbowY - Math.floor(armLen/2), 0, TYPES.CORE);
+                }
+
+                // Details
+                const keys = Array.from(this.voxels.keys());
+                keys.forEach(key => {
+                    if (this.rand() < (params.detail * 0.1)) {
+                        const [x,y,z] = key.split(',').map(Number);
+                        const type = this.voxels.get(key);
+                        if (type === TYPES.ARMOR && x > 0) {
+                            if (this.rand() > 0.5) this.setSym(x+1, y, z, TYPES.DETAIL);
+                            else if (this.rand() > 0.8) this.setSym(x, y, z, TYPES.ENERGY);
+                        }
+                    }
+                });
+            }
+        }
+
+        class RandomObjectGen extends VoxelGenerator {
+            generate(type) {
+                this.voxels.clear();
+                const groundY = 2; 
+                
+                if (type === 'car') {
+                    this.fillBox(-4, groundY+1, -2, 4, groundY+2, 2, TYPES.ARMOR, false);
+                    this.fillBox(-2, groundY+3, -2, 1, groundY+4, 2, TYPES.CORE, false);
+                    this.set(-3, groundY, -3, TYPES.JOINT); this.set(3, groundY, -3, TYPES.JOINT);
+                    this.set(-3, groundY, 3, TYPES.JOINT);  this.set(3, groundY, 3, TYPES.JOINT);
+                    this.set(4, groundY+2, -1, TYPES.ENERGY); this.set(4, groundY+2, 1, TYPES.ENERGY);
+                    this.set(-4, groundY+2, -1, TYPES.SENSOR); this.set(-4, groundY+2, 1, TYPES.SENSOR);
+                } 
+                else if (type === 'bus') {
+                    this.fillBox(-6, groundY+1, -2, 6, groundY+4, 2, TYPES.ARMOR, false);
+                    for(let x=-5; x<5; x+=2) this.fillBox(x, groundY+3, -3, x+1, groundY+3, 3, TYPES.ENERGY, false);
+                    this.fillBox(-4, groundY, -2, -3, groundY, 2, TYPES.JOINT, false);
+                    this.fillBox(4, groundY, -2, 5, groundY, 2, TYPES.JOINT, false);
+                }
+                else if (type === 'phone') {
+                    this.fillBox(-2, groundY, -4, 2, groundY, 4, TYPES.CORE, false);
+                    this.fillBox(-1, groundY+1, -3, 1, groundY+1, 3, TYPES.ENERGY, false);
+                    this.set(0, groundY+1, -3, TYPES.JOINT);
+                }
+            }
+        }
+
+        // --- 4. PALETTES ---
+        const PALETTES = {
+            industrial: { [TYPES.CORE]: 0x222222, [TYPES.ARMOR]: 0x776655, [TYPES.JOINT]: 0x111111, [TYPES.SENSOR]: 0xff3300, [TYPES.ENERGY]: 0xffaa00, [TYPES.DETAIL]: 0x444444 },
+            neon:       { [TYPES.CORE]: 0x050510, [TYPES.ARMOR]: 0x202040, [TYPES.JOINT]: 0x000000, [TYPES.SENSOR]: 0xff0055, [TYPES.ENERGY]: 0x00f3ff, [TYPES.DETAIL]: 0x303060 },
+            military:   { [TYPES.CORE]: 0x1a2218, [TYPES.ARMOR]: 0x445533, [TYPES.JOINT]: 0x111111, [TYPES.SENSOR]: 0xff0000, [TYPES.ENERGY]: 0x00ffaa, [TYPES.DETAIL]: 0x222222 },
+            chrome:     { [TYPES.CORE]: 0xaaaaaa, [TYPES.ARMOR]: 0xffffff, [TYPES.JOINT]: 0x333333, [TYPES.SENSOR]: 0xff0000, [TYPES.ENERGY]: 0x00ffff, [TYPES.DETAIL]: 0x888888 },
+            titanium:   { [TYPES.CORE]: 0x303035, [TYPES.ARMOR]: 0xdbdbe5, [TYPES.JOINT]: 0x151515, [TYPES.SENSOR]: 0x00aaff, [TYPES.ENERGY]: 0xffffff, [TYPES.DETAIL]: 0x707080 },
+            modern_bw:  { [TYPES.CORE]: 0x111111, [TYPES.ARMOR]: 0xeeeeee, [TYPES.JOINT]: 0x000000, [TYPES.SENSOR]: 0xffffff, [TYPES.ENERGY]: 0xdddddd, [TYPES.DETAIL]: 0x333333 },
+            true_black: { [TYPES.CORE]: 0x000000, [TYPES.ARMOR]: 0x000000, [TYPES.JOINT]: 0x000000, [TYPES.SENSOR]: 0xffffff, [TYPES.ENERGY]: 0x222222, [TYPES.DETAIL]: 0x050505 }
+        };
+
+        const MATERIAL_PROPS = {
+            industrial: { roughness: 0.7, metalness: 0.6, envMapIntensity: 0.3 },
+            neon:       { roughness: 0.4, metalness: 0.7, envMapIntensity: 0.5 },
+            military:   { roughness: 0.9, metalness: 0.1, envMapIntensity: 0.1 },
+            chrome:     { roughness: 0.0, metalness: 1.0, envMapIntensity: 1.0 },
+            titanium:   { roughness: 0.25, metalness: 0.85, envMapIntensity: 0.7 },
+            modern_bw:  { roughness: 0.3, metalness: 0.2, envMapIntensity: 0.4 },
+            true_black: { roughness: 0.8, metalness: 0.1, envMapIntensity: 0.1 } 
+        };
+
+        // --- 5. RENDERER & ANIMATION ---
+        const MAX_INSTANCES = 4000;
+
+        class RobotRenderer {
+            constructor(containerId) {
+                this.container = document.getElementById(containerId);
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(30, 25, 30);
+                
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.0;
+                this.container.appendChild(this.renderer.domElement);
+                
+                const pmremGenerator = new THREE.PMREMGenerator(this.renderer);
+                this.scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.autoRotate = true;
+                this.controls.autoRotateSpeed = 0.5;
+                
+                this.initLights();
+                this.initGrid();
+                this.initMeshes();
+
+                window.addEventListener('resize', () => this.onResize());
+                
+                this.particles = [];
+                for(let i=0; i<MAX_INSTANCES; i++) {
+                    this.particles.push({
+                        pos: new THREE.Vector3(),
+                        target: new THREE.Vector3(),
+                        vel: new THREE.Vector3(),
+                        color: new THREE.Color(),
+                        targetColor: new THREE.Color(),
+                        active: false,
+                        grounded: false
+                    });
+                }
+                
+                this.state = 'STATIC'; // STATIC, FALLING, MORPHING
+                this.morphProgress = 0;
+
+                this.animate();
+            }
+
+            initLights() {
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+                this.scene.add(ambientLight);
+                const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
+                dirLight.position.set(15, 30, 10);
+                dirLight.castShadow = true;
+                dirLight.shadow.mapSize.width = 2048;
+                dirLight.shadow.mapSize.height = 2048;
+                this.scene.add(dirLight);
+                const rimLight = new THREE.DirectionalLight(0x00f3ff, 2.0);
+                rimLight.position.set(-20, 0, -20);
+                this.scene.add(rimLight);
+            }
+
+            initGrid() {
+                const gridHelper = new THREE.GridHelper(100, 50, 0x00f3ff, 0x003344);
+                gridHelper.position.y = 0.05;
+                this.scene.add(gridHelper);
+                const geometry = new THREE.PlaneGeometry(200, 200);
+                const material = new THREE.MeshStandardMaterial({ color: 0x050510, roughness: 0.3, metalness: 0.6 });
+                const plane = new THREE.Mesh(geometry, material);
+                plane.rotation.x = -Math.PI / 2;
+                plane.receiveShadow = true;
+                this.scene.add(plane);
+            }
+
+            initMeshes() {
+                this.robotGroup = new THREE.Group();
+                this.scene.add(this.robotGroup);
+
+                const geometry = new THREE.BoxGeometry(1, 1, 1);
+                this.material = new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.5 });
+                this.mesh = new THREE.InstancedMesh(geometry, this.material, MAX_INSTANCES);
+                this.mesh.castShadow = true;
+                this.mesh.receiveShadow = true;
+                this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); // OPTIMIZATION for animation
+                this.robotGroup.add(this.mesh);
+
+                const wireGeo = new THREE.BoxGeometry(1.002, 1.002, 1.002);
+                const wireMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, wireframe: true, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending });
+                this.wireMesh = new THREE.InstancedMesh(wireGeo, wireMat, MAX_INSTANCES);
+                this.wireMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                this.robotGroup.add(this.wireMesh);
+            }
+
+            // Sets target positions and colors for particles
+            setTargetShape(voxels, paletteKey, immediate = false) {
+                const palette = PALETTES[paletteKey];
+                const props = MATERIAL_PROPS[paletteKey] || { roughness: 0.5, metalness: 0.5, envMapIntensity: 0.5 };
+                
+                // Update Material Props
+                this.material.roughness = props.roughness;
+                this.material.metalness = props.metalness;
+                this.material.envMapIntensity = props.envMapIntensity;
+                this.material.needsUpdate = true;
+
+                // Center logic
+                const center = new THREE.Vector3();
+                let minY = Infinity;
+                voxels.forEach(v => {
+                    center.x += v.x; center.y += v.y; center.z += v.z;
+                    if(v.y < minY) minY = v.y;
+                });
+                center.divideScalar(voxels.length);
+
+                for(let i=0; i<MAX_INSTANCES; i++) {
+                    const p = this.particles[i];
+                    if(i < voxels.length) {
+                        const v = voxels[i];
+                        // Calculate centered position
+                        const tx = v.x - center.x;
+                        const ty = v.y - minY;
+                        const tz = v.z - center.z;
+
+                        p.target.set(tx, ty, tz);
+                        p.targetColor.setHex(palette[v.type]);
+                        if(v.type === TYPES.ENERGY || v.type === TYPES.SENSOR) p.targetColor.addScalar(0.5);
+
+                        p.active = true;
+
+                        if (immediate) {
+                            p.pos.copy(p.target);
+                            p.color.copy(p.targetColor);
+                            p.vel.set(0,0,0);
+                            p.grounded = false;
+                        }
+                    } else {
+                        p.active = false;
+                        p.target.set(0, -10, 0); // Hide
+                    }
+                }
+                this.count = voxels.length;
+                this.mesh.count = MAX_INSTANCES; // Draw all to allow animation of pool
+                this.wireMesh.count = MAX_INSTANCES;
+            }
+
+            // Trigger explosion physics
+            explode() {
+                this.state = 'FALLING';
+                // Only explode visible particles or those currently active
+                for(let i=0; i<MAX_INSTANCES; i++) {
+                    const p = this.particles[i];
+                    if (p.active || p.pos.y > 1.0) { // If active or floating
+                        p.vel.set(
+                            (Math.random() - 0.5) * 0.8, // Increased spread
+                            Math.random() * 0.8, 
+                            (Math.random() - 0.5) * 0.8
+                        );
+                        p.grounded = false;
+                    }
+                }
+            }
+
+            // Trigger morph lerp
+            morph() {
+                this.state = 'MORPHING';
+                this.morphProgress = 0;
+            }
+
+            updateParticles() {
+                const dummy = new THREE.Object3D();
+                
+                if (this.state === 'FALLING') {
+                    for(let i=0; i<MAX_INSTANCES; i++) {
+                        const p = this.particles[i];
+                        if (!p.grounded && (p.active || p.pos.y > -5)) {
+                            p.vel.y -= 0.025; // Slightly stronger gravity
+                            p.pos.add(p.vel);
+                            // Floor collision
+                            if (p.pos.y <= 0.5) {
+                                p.pos.y = 0.5;
+                                p.vel.y *= -0.3; // Low bounce
+                                p.vel.x *= 0.95;  // Sliding friction
+                                p.vel.z *= 0.95;
+                                if (Math.abs(p.vel.y) < 0.1 && Math.abs(p.vel.x) < 0.1) p.grounded = true;
+                            }
+                        }
+                    }
+                } 
+                else if (this.state === 'MORPHING') {
+                    this.morphProgress += 0.02; // Speed of morph
+                    if (this.morphProgress >= 1) {
+                        this.state = 'STATIC';
+                        this.morphProgress = 1;
+                    }
+                    const t = this.morphProgress;
+                    // Ease out cubic
+                    const ease = 1 - Math.pow(1 - t, 3);
+                    
+                    for(let i=0; i<MAX_INSTANCES; i++) {
+                        const p = this.particles[i];
+                        if (p.active) {
+                             p.pos.lerp(p.target, 0.1); 
+                             p.color.lerp(p.targetColor, 0.05);
+                        }
+                    }
+                }
+                else {
+                    // STATIC logic: snap to target to correct drift
+                    for(let i=0; i<MAX_INSTANCES; i++) {
+                        if (this.particles[i].active) {
+                            this.particles[i].pos.lerp(this.particles[i].target, 0.2);
+                        }
+                    }
+                }
+
+                // Update Meshes
+                for(let i=0; i<MAX_INSTANCES; i++) {
+                    const p = this.particles[i];
+                    // Render if active OR if falling/bouncing near floor
+                    if (p.active || p.pos.y > -2) {
+                        dummy.position.copy(p.pos);
+                        dummy.updateMatrix();
+                        this.mesh.setMatrixAt(i, dummy.matrix);
+                        this.mesh.setColorAt(i, p.color);
+                        this.wireMesh.setMatrixAt(i, dummy.matrix);
+                    } else {
+                        // Move inactive far away
+                        dummy.position.set(0, -100, 0);
+                        dummy.updateMatrix();
+                        this.mesh.setMatrixAt(i, dummy.matrix);
+                        this.wireMesh.setMatrixAt(i, dummy.matrix);
+                    }
+                }
+                this.mesh.instanceMatrix.needsUpdate = true;
+                this.mesh.instanceColor.needsUpdate = true;
+                this.wireMesh.instanceMatrix.needsUpdate = true;
+            }
+
+            onResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                this.updateParticles();
+                this.controls.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // --- 6. APP CONTROLLER ---
+        const ui = {
+            seed: document.getElementById('seedInput'),
+            randBtn: document.getElementById('randomSeedBtn'),
+            genBtn: document.getElementById('generateBtn'),
+            dlBtn: document.getElementById('downloadBtn'),
+            morphBtn: document.getElementById('morphBtn'),
+            palette: document.getElementById('paletteSelect'),
+            height: document.getElementById('heightRange'),
+            width: document.getElementById('widthRange'),
+            thick: document.getElementById('thicknessRange'),
+            head: document.getElementById('headRange'),
+            detail: document.getElementById('detailRange'),
+            musicBtn: document.getElementById('musicBtn')
+        };
+
+        const renderer = new RobotRenderer('canvas-container');
+        const sfx = new SoundFX();
+        
+        // Initial Name
+        ui.seed.value = generateGreekName();
+        
+        const robotGen = new RobotGen(ui.seed.value);
+        const objGen = new RandomObjectGen("obj");
+
+        let currentVoxels = [];
+        let robotVoxels = []; // Store robot state to return to
+        
+        function getParams() {
+            return {
+                height: parseFloat(ui.height.value),
+                width: parseFloat(ui.width.value),
+                thickness: parseInt(ui.thick.value),
+                head: parseFloat(ui.head.value),
+                detail: parseFloat(ui.detail.value)
+            };
+        }
+
+        function generate(immediate = true) {
+            sfx.enable(); 
+            if(immediate) sfx.playBuild();
+            
+            const seed = ui.seed.value || "Alpha-001";
+            robotGen.seed = seed;
+            const seedNum = cyrb128(seed.toString());
+            robotGen.rng = mulberry32(seedNum); // Reseed
+            
+            robotGen.generate(getParams());
+            currentVoxels = robotGen.getVoxelData();
+            robotVoxels = [...currentVoxels]; // Backup
+
+            renderer.setTargetShape(currentVoxels, ui.palette.value, immediate);
+            if (!immediate) renderer.morph();
+            document.getElementById('loading').style.opacity = 0;
+        }
+
+        async function triggerDeconstruct() {
+            sfx.enable();
+            sfx.playDeconstruct();
+            
+            // 1. Collapse Robot
+            renderer.explode();
+
+            // 2. Wait
+            await new Promise(r => setTimeout(r, 1500));
+
+            // 3. Generate Random Object & Morph (Floor -> Object)
+            const types = ['car', 'bus', 'phone'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            objGen.seed = Math.random(); 
+            objGen.generate(type);
+            const objVoxels = objGen.getVoxelData();
+            
+            sfx.playBuild();
+            renderer.setTargetShape(objVoxels, ui.palette.value, false);
+            renderer.morph();
+
+            // 4. Wait (Show Object)
+            await new Promise(r => setTimeout(r, 3000));
+
+            // 5. Collapse Object (Second Explosion)
+            sfx.playDeconstruct();
+            renderer.explode();
+            
+            // 6. Wait
+            await new Promise(r => setTimeout(r, 1500));
+            
+            // 7. Morph Back (Floor -> Robot)
+            sfx.playBuild();
+            renderer.setTargetShape(robotVoxels, ui.palette.value, false);
+            renderer.morph();
+        }
+
+        // Bindings
+        ui.genBtn.addEventListener('click', () => { sfx.playClick(); generate(true); });
+        
+        // New Greek Name Generator
+        ui.randBtn.addEventListener('click', () => {
+            sfx.playClick();
+            ui.seed.value = generateGreekName();
+            generate(true);
+        });
+        
+        ui.morphBtn.addEventListener('click', triggerDeconstruct);
+        ui.musicBtn.addEventListener('click', () => {
+             const isPlaying = sfx.toggleMusic();
+             ui.musicBtn.textContent = isPlaying ? '♫ ON' : '♫ OFF';
+             ui.musicBtn.classList.toggle('active', isPlaying);
+        });
+        
+        [ui.height, ui.width, ui.thick, ui.head, ui.detail, ui.palette].forEach(el => {
+            el.addEventListener('input', () => generate(true));
+        });
+
+        ui.dlBtn.addEventListener('click', () => {
+            sfx.playClick();
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentVoxels));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `mech_${ui.seed.value}.json`);
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        });
+
+        // Start
+        generate(true);
+
+    </script>
+</body>
+</html>
