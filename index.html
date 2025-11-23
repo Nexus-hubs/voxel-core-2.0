@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VOXEL CORE 2.0 - INITIALIZING</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        #intro-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at center, #0a0a1a 0%, #000000 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* Animated Grid Background */
+        #grid-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            opacity: 0.3;
+        }
+
+        /* Main Logo Container */
+        .logo-container {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            animation: fadeInScale 1.5s ease-out;
+        }
+
+        /* Metallic Logo Text */
+        .logo-text {
+            font-size: clamp(3rem, 12vw, 8rem);
+            font-weight: 900;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            background: linear-gradient(
+                135deg,
+                #667eea 0%,
+                #00f3ff 25%,
+                #ffffff 50%,
+                #00f3ff 75%,
+                #667eea 100%
+            );
+            background-size: 400% 400%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: metallicShine 3s ease-in-out infinite;
+            filter: drop-shadow(0 0 30px rgba(0, 243, 255, 0.8))
+                    drop-shadow(0 0 60px rgba(102, 126, 234, 0.5));
+            position: relative;
+        }
+
+        .logo-subtitle {
+            font-size: clamp(1rem, 3vw, 2rem);
+            letter-spacing: 0.3em;
+            color: #00f3ff;
+            margin-top: 20px;
+            opacity: 0;
+            animation: fadeIn 2s ease-out 0.5s forwards;
+            text-shadow: 0 0 20px rgba(0, 243, 255, 0.8);
+        }
+
+        /* Version Badge */
+        .version-badge {
+            position: absolute;
+            top: 50%;
+            right: -120px;
+            transform: translateY(-50%);
+            background: rgba(0, 243, 255, 0.1);
+            border: 2px solid #00f3ff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: #00f3ff;
+            font-weight: bold;
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: slideInRight 1s ease-out 1s forwards;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+        }
+
+        /* Loading Bar */
+        .loading-container {
+            position: absolute;
+            bottom: 15vh;
+            width: 60%;
+            max-width: 600px;
+            z-index: 10;
+            opacity: 0;
+            animation: fadeIn 1s ease-out 1.5s forwards;
+        }
+
+        .loading-bar-bg {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: inset 0 0 10px rgba(0, 243, 255, 0.2);
+        }
+
+        .loading-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #00f3ff, #ffffff);
+            background-size: 200% 100%;
+            border-radius: 10px;
+            animation: loadingProgress 3s ease-in-out forwards,
+                       shimmer 1.5s linear infinite;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.8);
+        }
+
+        .loading-text {
+            color: #00f3ff;
+            font-size: 0.9rem;
+            letter-spacing: 0.2em;
+            margin-top: 15px;
+            text-align: center;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.8);
+            font-weight: 600;
+        }
+
+        /* Particle Container */
+        .particles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #00f3ff;
+            border-radius: 50%;
+            animation: float 10s infinite;
+            box-shadow: 0 0 4px #00f3ff;
+        }
+
+        /* Skip Button */
+        .skip-button {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            padding: 12px 24px;
+            background: transparent;
+            border: 2px solid #00f3ff;
+            color: #00f3ff;
+            font-size: 0.9rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            z-index: 20;
+            text-transform: uppercase;
+            opacity: 0;
+            animation: fadeIn 1s ease-out 2s forwards;
+        }
+
+        .skip-button:hover {
+            background: #00f3ff;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.8);
+            transform: scale(1.05);
+        }
+
+        /* Fade Out Animation */
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                transform: scale(1.1);
+            }
+        }
+
+        .fade-out {
+            animation: fadeOut 0.8s ease-out forwards;
+        }
+
+        /* Animations */
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.8) translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                right: -150px;
+            }
+            to {
+                opacity: 1;
+                right: -120px;
+            }
+        }
+
+        @keyframes metallicShine {
+            0%, 100% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+        }
+
+        @keyframes loadingProgress {
+            from { width: 0%; }
+            to { width: 100%; }
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translate(0, 0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translate(var(--tx), var(--ty));
+                opacity: 0;
+            }
+        }
+
+        /* Glitch Effect (subtle) */
+        .glitch {
+            position: relative;
+        }
+
+        .glitch::before,
+        .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: inherit;
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        .glitch::before {
+            animation: glitch1 2s infinite;
+            clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%);
+            transform: translate(-2px, -2px);
+            opacity: 0.8;
+        }
+
+        .glitch::after {
+            animation: glitch2 2s infinite;
+            clip-path: polygon(0 55%, 100% 55%, 100% 100%, 0 100%);
+            transform: translate(2px, 2px);
+            opacity: 0.8;
+        }
+
+        @keyframes glitch1 {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+        }
+
+        @keyframes glitch2 {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(2px, -2px); }
+            40% { transform: translate(2px, 2px); }
+            60% { transform: translate(-2px, -2px); }
+            80% { transform: translate(-2px, 2px); }
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .version-badge {
+                position: static;
+                transform: none;
+                margin-top: 20px;
+                display: inline-block;
+            }
+
+            .loading-container {
+                width: 80%;
+            }
+
+            .skip-button {
+                bottom: 20px;
+                right: 20px;
+                padding: 10px 20px;
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="intro-container">
+        <canvas id="grid-canvas"></canvas>
+
+        <div class="particles" id="particles"></div>
+
+        <div class="logo-container">
+            <h1 class="logo-text glitch" data-text="VOXEL CORE">VOXEL CORE</h1>
+            <p class="logo-subtitle">PROCEDURAL GENERATION SYSTEM</p>
+            <div class="version-badge">v2.0</div>
+        </div>
+
+        <div class="loading-container">
+            <div class="loading-bar-bg">
+                <div class="loading-bar-fill"></div>
+            </div>
+            <div class="loading-text">INITIALIZING QUANTUM MATRICES...</div>
+        </div>
+
+        <button class="skip-button" onclick="skipIntro()">SKIP INTRO →</button>
+    </div>
+
+    <script>
+        // Grid Canvas Animation
+        const canvas = document.getElementById('grid-canvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let time = 0;
+        const gridSize = 40;
+
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#00f3ff';
+            ctx.lineWidth = 1;
+
+            // Perspective grid
+            const perspective = 600;
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            for (let i = -20; i < 20; i++) {
+                // Vertical lines
+                const x = i * gridSize;
+                const wave = Math.sin(time * 0.001 + i * 0.1) * 20;
+
+                ctx.beginPath();
+                ctx.globalAlpha = 0.3 + Math.sin(time * 0.001 + i * 0.2) * 0.2;
+
+                const startX = centerX + x + wave;
+                const startY = centerY - perspective;
+                const endX = centerX + x * 3 + wave;
+                const endY = centerY + perspective;
+
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+            }
+
+            for (let i = -10; i < 10; i++) {
+                // Horizontal lines
+                const y = i * gridSize;
+                const wave = Math.sin(time * 0.001 + i * 0.15) * 15;
+
+                ctx.beginPath();
+                ctx.globalAlpha = 0.2 + Math.sin(time * 0.001 + i * 0.15) * 0.15;
+
+                const z = i * 0.5;
+                const scale = (perspective + y) / perspective;
+
+                const startX = centerX - canvas.width / 2 * scale;
+                const endX = centerX + canvas.width / 2 * scale;
+                const lineY = centerY + y + wave;
+
+                ctx.moveTo(startX, lineY);
+                ctx.lineTo(endX, lineY);
+                ctx.stroke();
+            }
+
+            time++;
+            requestAnimationFrame(drawGrid);
+        }
+
+        drawGrid();
+
+        // Generate Particles
+        const particlesContainer = document.getElementById('particles');
+        for (let i = 0; i < 50; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+
+            const startX = Math.random() * 100;
+            const startY = Math.random() * 100;
+            const tx = (Math.random() - 0.5) * 200;
+            const ty = (Math.random() - 0.5) * 200;
+
+            particle.style.left = startX + '%';
+            particle.style.top = startY + '%';
+            particle.style.setProperty('--tx', tx + 'px');
+            particle.style.setProperty('--ty', ty + 'px');
+            particle.style.animationDelay = Math.random() * 10 + 's';
+            particle.style.animationDuration = (5 + Math.random() * 10) + 's';
+
+            particlesContainer.appendChild(particle);
+        }
+
+        // Loading Text Variations
+        const loadingTexts = [
+            'INITIALIZING QUANTUM MATRICES...',
+            'CALIBRATING VOXEL PROCESSORS...',
+            'LOADING PROCEDURAL ALGORITHMS...',
+            'ESTABLISHING NEURAL PATHWAYS...',
+            'SYSTEMS READY...'
+        ];
+
+        let textIndex = 0;
+        const loadingTextEl = document.querySelector('.loading-text');
+
+        function updateLoadingText() {
+            if (textIndex < loadingTexts.length) {
+                loadingTextEl.style.opacity = '0';
+                setTimeout(() => {
+                    loadingTextEl.textContent = loadingTexts[textIndex];
+                    loadingTextEl.style.opacity = '1';
+                    textIndex++;
+                }, 300);
+            }
+        }
+
+        // Update text every 700ms
+        const textInterval = setInterval(updateLoadingText, 700);
+
+        // Auto-redirect after animation
+        function skipIntro() {
+            clearInterval(textInterval);
+            document.getElementById('intro-container').classList.add('fade-out');
+            setTimeout(() => {
+                window.location.href = 'procedural_voxel_robot_generator.html';
+            }, 800);
+        }
+
+        // Auto-redirect after 4 seconds
+        setTimeout(skipIntro, 4000);
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Click anywhere to skip
+        document.getElementById('intro-container').addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                skipIntro();
+            }
+        });
+    </script>
+</body>
+</html>
