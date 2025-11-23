@@ -1134,6 +1134,25 @@
             downloadAnchorNode.remove();
         });
 
+        // Double-tap to deconstruct (Mobile)
+        let lastTap = 0;
+        const doubleTapDelay = 300; // milliseconds
+
+        document.getElementById('canvas-container').addEventListener('touchend', (e) => {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+
+            if (tapLength < doubleTapDelay && tapLength > 0) {
+                // Double tap detected
+                e.preventDefault();
+                sfx.playClick();
+                triggerDeconstruct();
+                lastTap = 0; // Reset to prevent triple-tap triggering twice
+            } else {
+                lastTap = currentTime;
+            }
+        });
+
         // Start
         generate(true);
 
